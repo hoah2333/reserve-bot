@@ -1,0 +1,39 @@
+name: 发布
+
+on:
+  push:
+    branches: ['master']
+
+permissions:
+  packages: write
+  contents: write
+
+jobs:
+  deploy:
+    concurrency: ci-${{ github.ref }}
+
+    name: 发布
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检查
+        uses: actions/checkout@v4
+        with:
+          ref: master
+
+      - name: 构建
+        run: |
+          npm install vite
+          npm run build
+          zip latest.zip package.json package-lock.json
+          zip -r latest.zip build/
+
+      - name: 创建新发布
+        uses: "marvinpinto/action-automatic-releases@latest"
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          automatic_release_tag: "latest"
+          prerelease: false
+          title: ${{ github.event.head_commit.message }}
+          files: |
+            latest.zip
