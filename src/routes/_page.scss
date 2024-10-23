@@ -1,0 +1,27 @@
+.header {
+    text-align: center;
+}
+
+.reserve-table {
+    display: flex;
+    justify-content: center;
+    table {
+        border-collapse: collapse;
+        tr {
+            th,
+            td {
+                border: 2px solid #3d4f58;
+                padding: 0.5rem;
+            }
+            th {
+                background-color: #00684a;
+            }
+            td {
+                background-color: #001e2b;
+                a {
+                    color: #00ed64;
+                }
+            }
+        }
+    }
+}

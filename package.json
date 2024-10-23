@@ -1,6 +1,6 @@
 {
 	"name": "reserve-bot",
-	"version": "0.0.1",
+	"version": "1.0.1",
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",
@@ -32,6 +32,7 @@
 		"express": "^4.19.2",
 		"globals": "^15.8.0",
 		"lodash": "^4.17.21",
+		"mongodb": "^6.8.0",
 		"prettier": "^3.3.3",
 		"prettier-plugin-svelte": "^3.2.6",
 		"sass": "^1.77.8",

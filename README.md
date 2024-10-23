@@ -1,6 +1,6 @@
-# Tag Translator
+# Reserve Bot
 
-A Tag Translator for Wikidot Backrooms Wiki, by hoah2333.
+A Reserve Bot for Wikidot Backrooms CN Wiki, by hoah2333.
 
 ## Contributing
 
