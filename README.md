@@ -19,9 +19,9 @@ npm run dev -- --open
 After that, due to the adapter of `dev` mode is different from `build` mode, you must build and see if there's any error on your code.
 
 ```bash
-# build the translator
+# build the bot
 npm run build
-# check the translator on your computer
+# check the bot on your computer
 npm run preview -- --open
 ```
 
