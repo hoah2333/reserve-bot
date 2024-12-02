@@ -38,7 +38,7 @@
                     >
                     <td data-id={dbData._id}
                         ><a
-                            href="http://backrooms-tech-cn.wikidot.com/{dbData.reservePage}"
+                            href="https://backrooms-tech-cn.wikidot.com/{dbData.reservePage}"
                             target="_blank"
                             rel="noopener noreferrer">{dbData.title}</a
                         ></td

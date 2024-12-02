@@ -21,7 +21,7 @@ const config: {
     dbLink: string;
 } = JSON.parse(fs.readFileSync("./config.json", "utf-8"));
 
-const techSiteName: string = "http://backrooms-tech-cn.wikidot.com";
+const techSiteName: string = "https://backrooms-tech-cn.wikidot.com";
 const techSiteId: number = 5041861;
 const wikiSiteId: number = 4716348;
 
