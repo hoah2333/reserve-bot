@@ -2,7 +2,7 @@
 const config = {
   printWidth: 120,
   tabWidth: 2,
-  plugins: ["prettier-plugin-svelte"],
+  plugins: ["prettier-plugin-svelte", "prettier-plugin-organize-imports"],
   trailingComma: "all",
   experimentalTernaries: true,
   quoteProps: "consistent",

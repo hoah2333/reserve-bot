@@ -1,240 +1,181 @@
-import axios from "axios";
-import { AxiosError, type AxiosResponse } from "axios";
+import { JSDOM } from "jsdom";
+import { stringify as qsStringify } from "qs";
 
-import * as cheerio from "cheerio";
+import type { AjaxResponse, QuickModuleResponse } from "./types";
 
-class WDmethod {
-  public base: string;
-  public ajax: string;
-  public quick: string;
-  public cookie: string;
-  constructor(base: string) {
-    this.base = base;
-    this.ajax = `${base}/ajax-module-connector.php`;
-    this.quick = `${base}/quickmodule.php`;
-    this.cookie = "";
-  }
+export const wdMethod = (baseUrl: string) => {
+  let cookie: string = "";
+  const ajaxPath: string = `${baseUrl}/ajax-module-connector.php`;
+  const quickPath: string = `${baseUrl}/quickmodule.php`;
 
-  async login(username: string, password: string): Promise<this> {
-    const wikidotToken7: string = Math.random().toString(36).substring(4).toLowerCase();
-    const cookie: string = `wikidot_token7=${wikidotToken7};`;
-    let response: AxiosResponse | null = null;
+  const generateToken = (): string => Math.random().toString(16).substring(4).toLowerCase();
+  const errorInfo = (message: string, error: unknown): void =>
+    console.error(`${new Date().toLocaleString()} - ${message}：${error}`);
 
+  const headers = (token: string = generateToken()): Record<string, string> => ({
+    "User-Agent":
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+    "Cookie": `${cookie} wikidot_token7=${token};`,
+    "Origin": baseUrl,
+    "Referer": "BRBot.aic",
+  });
+
+  const isNonRetryableError = (error: unknown): boolean => Boolean((error as { noRetry?: boolean })?.noRetry === true);
+
+  const retry = async <T>(fn: () => Promise<T>, retryCount: number = 0): Promise<T> => {
     try {
-      response = await axios({
-        method: "post",
-        url: "https://www.wikidot.com/default--flow/login__LoginPopupScreen",
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
-          "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-          "Cookie": cookie,
-          "Origin": this.base,
-          "Referer": "BRBot.aic",
-        },
-        data: {
-          callbackIndex: 0,
-          wikidot_token7: wikidotToken7,
-          login: username,
-          password: password,
-          action: "Login2Action",
-          event: "login",
-        },
-      });
-    } catch (error: any) {
-      if (
-        error.code === "ECONNRESET" &&
-        (error.cause == "Error: socket hang up" || error.cause == "Error: read ECONNRESET")
-      ) {
-        console.error(`${new Date().toLocaleString()} - 在获取 ${error.request._currentUrl} 时连接被重置，正在重试。`);
-        return await this.login(username, password);
-      } else if (error instanceof AxiosError) {
-        console.error(
-          `${new Date().toLocaleString()} - 在获取 ${error.request._currentUrl} 时出现 ${error.code} 错误，原因：${error.cause}`,
-        );
-      }
+      return await fn();
+    } catch (error) {
+      if (isNonRetryableError(error) || retryCount >= 60) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 1000 * (retryCount + 1)));
+      return await retry<T>(fn, retryCount + 1);
     }
+  };
 
-    if (response != null) {
-      let $: cheerio.CheerioAPI = cheerio.load(response.data);
-      if (
-        $("h2.error")
-          .map(function () {
-            return $(this).text();
-          })
-          .get()
-          .join("")
-          .includes("The login and password do not match.")
-      ) {
-        throw new Error(`${new Date().toLocaleString()} - 登录失败，请检查用户名和密码`);
-      }
-      if (response.headers["set-cookie"]) {
-        let setCookie: string[] = response.headers["set-cookie"][1].split("; ");
-        let session: string = setCookie[0];
-        this.cookie = `${session}; wikidot_udsession=1;`;
-      }
-    }
-
-    return this;
-  }
-
-  async ajaxPost(params: Record<string, string | number>, moduleName: string): Promise<AxiosResponse> {
-    const wikidotToken7: string = Math.random().toString(36).substring(4).toLowerCase();
-    const cookie: string = `${this.cookie} wikidot_token7=${wikidotToken7};`;
-    let response: AxiosResponse | null = null;
-
-    try {
-      response = await axios({
-        method: "post",
-        url: this.ajax,
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
-          "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-          "Cookie": cookie,
-          "Origin": this.base,
-          "Referer": "BRBot.aic",
-        },
-        data: Object.assign(
-          {
-            moduleName: moduleName,
+  const login = async (username: string, password: string): Promise<void> => {
+    return await retry(async () => {
+      try {
+        const token7 = generateToken();
+        const response = await fetch("https://www.wikidot.com/default--flow/login__LoginPopupScreen", {
+          method: "POST",
+          redirect: "follow",
+          headers: headers(token7),
+          body: qsStringify({
             callbackIndex: 0,
-            wikidot_token7: wikidotToken7,
-          },
-          params,
-        ),
-      });
-    } catch (error: any) {
-      if (
-        error.code === "ECONNRESET" &&
-        (error.cause == "Error: socket hang up" || error.cause == "Error: read ECONNRESET")
-      ) {
-        console.error(`${new Date().toLocaleString()} - 在获取 ${error.request._currentUrl} 时连接被重置，正在重试。`);
-        return await this.ajaxPost(params, moduleName);
-      } else if (error instanceof AxiosError) {
-        console.error(
-          `${new Date().toLocaleString()} - 在获取 ${error.request._currentUrl} 时出现 ${error.code} 错误，原因：${error.cause}`,
-        );
+            wikidot_token7: token7,
+            login: username,
+            password: password,
+            action: "Login2Action",
+            event: "login",
+          }),
+        });
+        if (!response.ok) {
+          throw new Error(response.statusText);
+        }
+        const loginDom: JSDOM = new JSDOM(await response.text());
+        const errorMessage: HTMLElement | null = loginDom.window.document.querySelector("h2.error");
+        if (errorMessage?.textContent.includes("The login and password do not match.")) {
+          const authError = new Error("用户名或密码错误");
+          (authError as { noRetry?: boolean }).noRetry = true;
+          throw authError;
+        }
+        const setCookie: string | null = response.headers.get("Set-Cookie");
+        if (setCookie) {
+          const sessionId = setCookie.match(/WIKIDOT_SESSION_ID=([^;]+)/)?.[1];
+          cookie = `WIKIDOT_SESSION_ID=${sessionId}; wikidot_udsession=1;`;
+        }
+      } catch (error) {
+        errorInfo("登录失败", error);
+        throw error;
       }
-    }
+    });
+  };
 
-    if (response != null) {
-      return response;
-    } else {
-      console.error(`${new Date().toLocaleString()} - 获取页面失败`);
-      throw new Error(`${new Date().toLocaleString()} - 获取页面失败`);
-    }
-  }
+  const ajaxPost = async (params: Record<string, string | number>, moduleName: string): Promise<AjaxResponse> => {
+    return await retry(async () => {
+      try {
+        const token7 = generateToken();
+        const response = await fetch(ajaxPath, {
+          method: "POST",
+          headers: headers(token7),
+          body: qsStringify(Object.assign({ moduleName, callbackIndex: 0, wikidot_token7: token7 }, params)),
+        });
+        if (!response.ok) {
+          throw new Error(response.statusText);
+        }
+        return await response.json();
+      } catch (error) {
+        errorInfo("AJAX POST 失败", error);
+        throw error;
+      }
+    });
+  };
 
-  async pageActionPost(params: Record<string, string | number>, event: string): Promise<AxiosResponse> {
-    return this.ajaxPost(
-      Object.assign(
-        {
-          action: "WikiPageAction",
-          event: event,
-        },
-        params,
-      ),
-      "Empty",
+  /**
+   * @deprecated quickGet 大概率报错 Internal Server Error，使用 Crom API 查询页面是否存在
+   */
+  const quickGet = async (params: Record<string, string | number>, module: string): Promise<QuickModuleResponse> => {
+    return await retry<QuickModuleResponse>(async () => {
+      try {
+        const response = await fetch(quickPath + "?" + qsStringify(Object.assign({ module }, params)), {
+          method: "GET",
+          headers: headers(),
+        });
+
+        if (!response.ok) {
+          throw new Error(response.statusText);
+        }
+        return await response.json();
+      } catch (error) {
+        errorInfo("QuickModule GET 失败", error);
+        throw error;
+      }
+    });
+  };
+
+  const cromApiRequest = async (
+    gqlQueryString: string,
+    variables: Record<string, string>,
+  ): Promise<Record<string, any>> => {
+    return await retry(async () => {
+      try {
+        const response = await fetch("https://apiv1.crom.avn.sh/graphql", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: gqlQueryString, variables }),
+        });
+        if (!response.ok) {
+          throw new Error(response.statusText);
+        }
+        const { data, errors } = await response.json();
+        if (errors) {
+          throw new Error(errors[0].message);
+        }
+
+        return data;
+      } catch (error) {
+        errorInfo("Crom API 请求失败", error);
+        throw error;
+      }
+    });
+  };
+
+  const getPageSource = async (page: string, norender: boolean = true): Promise<string> => {
+    return await retry(async () => {
+      try {
+        const response = await fetch(
+          `${page.startsWith("http") ? page : `${baseUrl}/${page}`}${norender ? "/norender/true" : ""}`,
+          { method: "GET", headers: headers() },
+        );
+        if (!response.ok) {
+          throw new Error(response.statusText);
+        }
+        return await response.text();
+      } catch (error) {
+        errorInfo("获取页面源代码失败", error);
+        throw error;
+      }
+    });
+  };
+
+  const getPageId = async (page: string): Promise<number> => {
+    const pageSource: string = await getPageSource(page);
+    const dom: JSDOM = new JSDOM(pageSource);
+    const scriptTag: Element = Array.from(dom.window.document.querySelectorAll("head > script")).filter(
+      (element: Element): boolean => {
+        const scriptText: string = element.textContent || "";
+        return scriptText.includes("WIKIREQUEST");
+      },
+    )[0];
+    const pageIdMatch: RegExpMatchArray | null = scriptTag.textContent?.match(
+      /WIKIREQUEST\.info\.pageId\s*=\s*(\d+)\s*;/g,
     );
-  }
-
-  async quickGet(params: Record<string, string | number>, moduleName: string): Promise<AxiosResponse> {
-    let response: AxiosResponse | null = null;
-
-    try {
-      response = await axios({
-        method: "get",
-        url: this.quick,
-        params: Object.assign(
-          {
-            module: moduleName,
-          },
-          params,
-        ),
-      });
-    } catch (error: any) {
-      if (
-        error.code === "ECONNRESET" &&
-        (error.cause == "Error: socket hang up" || error.cause == "Error: read ECONNRESET")
-      ) {
-        console.error(`${new Date().toLocaleString()} - 在获取 ${error.request._currentUrl} 时连接被重置，正在重试。`);
-        return await this.quickGet(params, moduleName);
-      } else if (error instanceof AxiosError) {
-        console.error(
-          `${new Date().toLocaleString()} - 在获取 ${error.request._currentUrl} 时出现 ${error.code} 错误，原因：${error.cause}`,
-        );
-      }
+    if (pageIdMatch) {
+      return parseInt(pageIdMatch[0].slice(26, -1));
     }
+    return 0;
+  };
 
-    if (response != null) {
-      return response;
-    } else {
-      console.error(`${new Date().toLocaleString()} - 获取页面失败`);
-      throw new Error(`${new Date().toLocaleString()} - 获取页面失败`);
-    }
-  }
-
-  async getPageSource(page: string, norender: boolean = true): Promise<cheerio.CheerioAPI> {
-    let response: AxiosResponse | null = null;
-
-    try {
-      response = await axios({
-        method: "get",
-        url: `${page.startsWith("http") ? page : `${this.base}/${page}`}${norender ? "/norender/true" : ""}`,
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
-          "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-          "Cookie": this.cookie,
-          "Referer": "BRBot.aic",
-        },
-        validateStatus: (status: number): boolean => status >= 200 && status < 300,
-      });
-    } catch (error: any) {
-      if (
-        error.code === "ECONNRESET" &&
-        (error.cause == "Error: socket hang up" || error.cause == "Error: read ECONNRESET")
-      ) {
-        console.error(`${new Date().toLocaleString()} - 在获取 ${error.request._currentUrl} 时连接被重置，正在重试。`);
-        return await this.getPageSource(page, norender);
-      } else if (error instanceof AxiosError) {
-        console.error(
-          `${new Date().toLocaleString()} - 在获取 ${error.request._currentUrl} 时出现 ${error.code} 错误，原因：${error.cause}`,
-        );
-      }
-    }
-
-    if (response != null) {
-      return cheerio.load(response.data);
-    } else {
-      console.error(`${new Date().toLocaleString()} - 获取页面失败`);
-      return cheerio.load("<h1>获取页面失败</h1>");
-    }
-  }
-
-  async getPageId(page: string): Promise<number> {
-    let $: cheerio.CheerioAPI = await this.getPageSource(page);
-    let scripts: cheerio.Element[] = $("head")
-      .children("script")
-      .filter(function (_index: number, element: cheerio.Element) {
-        let html: string | null = $(element).html();
-        return html != null ? html.includes("WIKIREQUEST") : false;
-      })
-      .get();
-    let page_id: number;
-    let pageIdMatchResult: RegExpMatchArray | null = $(scripts)
-      .text()
-      .match(/WIKIREQUEST\.info\.pageId\s*=\s*(\d+)\s*;/g);
-    if (pageIdMatchResult != null) {
-      page_id = parseInt(pageIdMatchResult[0].slice(26));
-    } else {
-      console.error(`${new Date().toLocaleString()} - 获取 pageId 失败`);
-      throw new Error(`${new Date().toLocaleString()} - 获取 pageId 失败`);
-    }
-
-    return page_id;
-  }
-}
-
-export default WDmethod;
+  return { login, ajaxPost, quickGet, cromApiRequest, getPageSource, getPageId };
+};

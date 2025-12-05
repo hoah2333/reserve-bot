@@ -1,55 +1,52 @@
-import WDmodule from "$lib/WDmodule";
-import siteInfo from "$lib/siteInfo";
-import type { AxiosResponse } from "axios";
-import * as cheerio from "cheerio";
-import * as fs from "fs";
+import { wdModule } from "$lib/WDmodule";
+import { siteName } from "$lib/siteInfo";
+import { readFileSync } from "fs";
+import { JSDOM } from "jsdom";
 import { MongoClient } from "mongodb";
-import type { Db, Collection, WithId } from "mongodb";
 
-interface PageType {
-  username: string;
-  reservePage: string;
-  branchId: string;
-  originalLink: string;
-  date: Date;
-  title: string;
-}
+import type { AjaxResponse } from "$lib/types";
+import type { Collection, WithId } from "mongodb";
+import type { PageType } from "./types";
 
-const config: {
-  username: string;
-  password: string;
-  dbLink: string;
-} = JSON.parse(fs.readFileSync("./config.json", "utf-8"));
+const config: { username: string; password: string; dbLink: string } = JSON.parse(
+  readFileSync("./config.json", "utf-8"),
+);
+
+const debugInfo = (message: string): void => console.log(`${new Date().toLocaleString()} - ${message}`);
 
 const techSiteName: string = "https://backrooms-tech-cn.wikidot.com";
-const techSiteId: number = 5041861;
-const wikiSiteId: number = 4716348;
 
-const techSite: WDmodule = new WDmodule(techSiteName);
+const techSite = wdModule(techSiteName);
 
-const MongodbLink: string = config.dbLink;
+const mongodbLink: string = config.dbLink;
 
 try {
   await techSite.login(config.username, config.password);
-} catch (error: any) {
+} catch (error: unknown) {
   console.error(error);
+  console.error("登录失败");
 }
 
-console.log(`${new Date().toLocaleString()} - 程序开始运行`);
-await mainFunc();
-setInterval(mainFunc, 30000);
+debugInfo("程序开始运行");
+loopRun();
+
+async function loopRun(): Promise<void> {
+  await mainFunc();
+  await new Promise((resolve) => setTimeout(resolve, 300000));
+  loopRun();
+}
 
 async function mainFunc(): Promise<void> {
-  const client: MongoClient = new MongoClient(MongodbLink);
-  let reservingPages: AxiosResponse<any, any> = await techSite.getListpages({
+  const client: MongoClient = new MongoClient(mongodbLink);
+  const reservingPages: AjaxResponse = await techSite.getListpages({
     category: "reserve",
-    order: "created_at desc",
+    order: "created_at",
     perPage: "250",
     separate: "false",
     module_body:
       "|| %%created_by%% || %%fullname%% || %%form_raw{branch}%% || %%form_raw{page}%% || %%created_at%% || %%title%% ||",
   });
-  let outdatedPages: AxiosResponse<any, any> = await techSite.getListpages({
+  const outdatedPages: AjaxResponse = await techSite.getListpages({
     category: "outdate",
     order: "created_at desc",
     perPage: "250",
@@ -58,97 +55,62 @@ async function mainFunc(): Promise<void> {
       "|| %%created_by%% || %%fullname%% || %%form_raw{branch}%% || %%form_raw{page}%% || %%created_at%% || %%title%% ||",
   });
 
-  console.log(`${new Date().toLocaleString()} - 开始处理页面`);
-  let reserve: PageType[] = await listpagesHandler(cheerio.load(reservingPages.data.body));
-  let outdate: PageType[] = await listpagesHandler(cheerio.load(outdatedPages.data.body));
+  debugInfo("开始处理页面");
+  const reserve: PageType[] = await listpagesHandler(reservingPages.body);
   await reserveHandler(reserve);
+  const outdate: PageType[] = await listpagesHandler(outdatedPages.body);
   await reserveHandler(outdate, true);
   for (const value of reserve) {
     await insertDB(value);
   }
 
   await client.close();
+  debugInfo("程序运行结束");
 
-  async function listpagesHandler($: cheerio.CheerioAPI): Promise<PageType[]> {
-    return await Promise.all(
-      $("table.wiki-content-table tr")
-        .map(async function (this: cheerio.Element): Promise<PageType> {
-          let page: PageType = {
-            username: "",
-            reservePage: "",
-            branchId: "",
-            originalLink: "",
-            date: new Date(),
-            title: "",
-          };
-          let thisData: string[] = $(this)
-            .find("td")
-            .map((index: number, element: cheerio.Element): string => {
-              if (index != 4) {
-                return $(element).text();
-              } else {
-                return (
-                  $(element)
-                    .find("span.odate")
-                    .attr("class")
-                    ?.match(/time_([0-9]+)/)?.[1] || ""
-                );
-              }
-            })
-            .toArray();
-          let pageUnixName: string = thisData[1].replace(/^(reserve:)/, "");
-          let originalData: Record<string, string> | undefined = (
-            await techSite.searchPage(siteInfo.siteId[thisData[2]], pageUnixName)
-          ).find((result: Record<string, string>): boolean => result.unix_name === pageUnixName);
-          for (let index: number = 0; index < thisData.length; index++) {
-            switch (index) {
-              case 0:
-                page.username = thisData[index];
-                break;
-              case 1:
-                page.reservePage = thisData[index];
-                break;
-              case 2:
-                page.branchId = thisData[index];
-                break;
-              case 3:
-                if (originalData) {
-                  page.originalLink = `http://${siteInfo.siteName[page.branchId]}.wikidot.com/${pageUnixName}`;
-                } else {
-                  page.originalLink = thisData[index];
-                }
-                break;
-              case 4:
-                page.date = new Date(parseInt(`${thisData[index]}000`));
-                break;
-              case 5:
-                if (originalData) {
-                  page.title = originalData.title;
-                } else {
-                  page.title = thisData[index];
-                }
-            }
-          }
-          return page;
-        })
-        .get(),
-    );
+  async function listpagesHandler(pageBody: string): Promise<PageType[]> {
+    const dom: JSDOM = new JSDOM(pageBody);
+    const tables: HTMLTableElement[] = Array.from(dom.window.document.querySelectorAll("table.wiki-content-table tr"));
+    const pages: PageType[] = [];
+    for (const table of tables) {
+      const tdArray: HTMLTableCellElement[] = Array.from(table.querySelectorAll("td"));
+
+      const username: string = tdArray[0]?.textContent?.trim() ?? "";
+      const reservePage: string = tdArray[1]?.textContent?.trim() ?? "";
+      const branchIndex: string = tdArray[2]?.textContent?.trim() ?? "15";
+      const pageUnixName: string = reservePage.replace(/^(reserve:)/, "");
+
+      const hasOriginalData: boolean =
+        !!branchIndex && (await techSite.isPageExists(siteName[branchIndex], pageUnixName));
+      const rawOriginalLink: string = tdArray[3]?.textContent?.trim() ?? "";
+      const originalLink: string =
+        hasOriginalData && siteName[branchIndex] ?
+          `https://${siteName[branchIndex]}.wikidot.com/${pageUnixName}`
+        : rawOriginalLink;
+
+      const timestamp: string | undefined = tdArray[4]
+        ?.querySelector("span.odate")
+        ?.getAttribute("class")
+        ?.match(/time_(\d+)/)?.[1];
+      const date: Date = new Date(Number(timestamp ?? "0") * 1000);
+
+      const title: string = tdArray[5]?.textContent?.trim() ?? "";
+
+      pages.push({ username, reservePage, branchIndex, originalLink, date, title });
+    }
+    return pages;
   }
 
   async function insertDB(insertData: PageType): Promise<void> {
-    const database: Db = client.db("backrooms-reserve");
-    const reserved: Collection<PageType> = database.collection("reserved");
+    const reservedCollection: Collection<PageType> = client.db("backrooms-reserve").collection("reserved");
 
-    let dataInDB: WithId<PageType> | null = await reserved.findOne({ date: insertData.date });
+    const dataInDB: WithId<PageType> | null = await reservedCollection.findOne({ date: insertData.date });
 
     if (dataInDB == null) {
-      await reserved.insertOne(insertData);
-      console.log(`${new Date().toLocaleString()} - 已插入数据`);
+      await reservedCollection.insertOne(insertData);
     } else {
       for (const key in insertData) {
         if (insertData[key as keyof PageType].toLocaleString() !== dataInDB[key as keyof PageType].toLocaleString()) {
-          await reserved.updateOne({ _id: dataInDB._id }, { $set: insertData });
-          console.log(`${new Date().toLocaleString()} - 已更新数据`);
+          await reservedCollection.updateOne({ _id: dataInDB._id }, { $set: insertData });
           break;
         }
       }
@@ -160,17 +122,23 @@ async function mainFunc(): Promise<void> {
    * 1. 检查页面是否已翻译或无原文
    * 2. 当页面建立超过 30 日时自动将页面分类改为 outdate:
    * @param reserve - 翻译预定页面
-   * @param isOutdate -
+   * @param isOutdate - 是否为过期页面
    */
-  async function reserveHandler(reserve: PageType[], isOutdate = false): Promise<void> {
-    reserve.forEach(async (page: PageType): Promise<void> => {
-      let timeAgo: number = new Date().getTime() - page.date.getTime();
-      let pageUnixName: string = page.reservePage.replace(/^(reserve:)|(outdate:)/, "");
-      let pageTags: string = await techSite.getTags(page.reservePage);
+  async function reserveHandler(reserves: PageType[], isOutdate = false): Promise<void> {
+    for (const reservePage of reserves) {
+      const timeAgo: number = new Date().getTime() - reservePage.date.getTime();
+      const pageUnixName: string = reservePage.reservePage.replace(/^(reserve:)|(outdate:)/, "");
+      await tagEdit(siteName[reservePage.branchIndex], "无原文", true);
+      await tagEdit(siteName["99"], "已翻译", false);
 
-      await tagEdit(siteInfo.siteId[page.branchId], "无原文", true);
-      pageTags = await techSite.getTags(page.reservePage); // reset pageTags cause tagEdit may change it
-      await tagEdit(wikiSiteId, "已翻译", false);
+      if (!isOutdate && timeAgo > 1000 * 60 * 60 * 24 * 30) {
+        debugInfo(`${reservePage.reservePage} 页面已过期，正在重命名`);
+        if (await techSite.isPageExistsByListpages(pageUnixName, "outdate")) {
+          debugInfo(`${reservePage.reservePage} 检测到重复过期预定，正在删除较旧过期预定`);
+          await techSite.deletePage(`outdate:${pageUnixName}`);
+        }
+        await techSite.renamePage(reservePage.reservePage, `outdate:${pageUnixName}`);
+      }
 
       /**
        * 根据所提供 siteId 寻找目标站点中是否存在 pageUnixName 对应的页面。根据 isNeedFind 进行以下操作：
@@ -180,32 +148,20 @@ async function mainFunc(): Promise<void> {
        * @param tagName 需要添加或去除的标签
        * @param isNeedFind 是否需要在找到页面后添加标签，若为 false 则在找到页面后去除标签
        **/
-      async function tagEdit(siteId: number, tagName: string, isNeedFind: boolean): Promise<void> {
-        let isFindPage: Record<string, string> | undefined = (await techSite.searchPage(siteId, pageUnixName)).find(
-          (result: Record<string, string>): boolean => result.unix_name === pageUnixName,
-        );
+      async function tagEdit(siteName: string, tagName: string, isNeedFind: boolean): Promise<void> {
+        const pageTags: string[] = await techSite.getTags(reservePage.reservePage);
+        const isFindPage: boolean = await techSite.isPageExists(siteName, pageUnixName);
         if (!isFindPage !== isNeedFind && pageTags.includes(tagName)) {
-          console.log(`${new Date().toLocaleString()} - ${page.reservePage} 标签错误，已去除 ${tagName} 标签`);
-          await techSite.editTags(pageTags.replace(tagName, ""), page.reservePage);
+          debugInfo(`${reservePage.reservePage} 标签错误，已去除 ${tagName} 标签`);
+          await techSite.editTags(
+            pageTags.filter((tag: string): boolean => tag !== tagName),
+            reservePage.reservePage,
+          );
         } else if (!isFindPage === isNeedFind && !pageTags.includes(tagName)) {
-          console.log(`${new Date().toLocaleString()} - ${page.reservePage} 标签错误，已添加 ${tagName} 标签`);
-          await techSite.editTags(`${pageTags} ${tagName}`, page.reservePage);
+          debugInfo(`${reservePage.reservePage} 标签错误，已添加 ${tagName} 标签`);
+          await techSite.editTags([...pageTags, tagName], reservePage.reservePage);
         }
       }
-
-      if (!isOutdate && timeAgo > 1000 * 60 * 60 * 24 * 30) {
-        console.log(`${new Date().toLocaleString()} - ${page.reservePage} 页面已过期，正在重命名`);
-
-        if (
-          (await techSite.searchPage(techSiteId, `outdate:${pageUnixName}`)).find(
-            (result: Record<string, string>) => result.unix_name === `outdate:${pageUnixName}`,
-          )
-        ) {
-          console.log(`${new Date().toLocaleString()} - ${page.reservePage} 检测到重复过期预定，正在删除较旧过期预定`);
-          await techSite.deletePage(`outdate:${pageUnixName}`);
-        }
-        await techSite.renamePage(page.reservePage, `outdate:${pageUnixName}`);
-      }
-    });
+    }
   }
 }

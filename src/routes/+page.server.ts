@@ -1,37 +1,31 @@
-import type { PageServerLoad } from "./$types";
-import * as fs from "fs";
+import { readFileSync } from "fs";
 import { MongoClient } from "mongodb";
-import type { Db, Collection, WithId } from "mongodb";
 
-interface PageType {
-  username: string;
-  reservePage: string;
-  branchId: string;
-  originalLink: string;
-  date: Date;
-  title: string;
-}
+import type { Collection, WithId } from "mongodb";
+import type { PageServerLoad } from "./$types";
+import type { PageType } from "./types";
 
-const config: {
-  dbLink: string;
-} = JSON.parse(fs.readFileSync("./config.json", "utf-8"));
+const config: { dbLink: string } = JSON.parse(readFileSync("./config.json", "utf-8"));
 
-let dbContent: WithId<PageType>[];
+const createDbCache = () => {
+  let cache: WithId<PageType>[] = [];
+  const getCache = (): WithId<PageType>[] => cache;
+  const updateCache = async (): Promise<void> => {
+    const client: MongoClient = new MongoClient(config.dbLink);
+    const reserved: Collection<PageType> = client.db("backrooms-reserve").collection("reserved");
+    const freshData: WithId<PageType>[] = await reserved.find().toArray();
+    cache = JSON.parse(JSON.stringify(freshData)); // Deep Copy
+    await client.close();
+  };
 
-const MongodbLink: string = config.dbLink;
-
-async function getDbContent(): Promise<void> {
-  const client: MongoClient = new MongoClient(MongodbLink);
-  const database: Db = client.db("backrooms-reserve");
-  const reserved: Collection<PageType> = database.collection("reserved");
-  dbContent = JSON.parse(JSON.stringify(await reserved.find().toArray())); // Deep Copy
-  await client.close();
-}
-
-await getDbContent();
-
-setInterval(getDbContent, 30000);
-
-export const load: PageServerLoad = async (): Promise<Record<string, WithId<PageType>[]>> => {
-  return { dbContent };
+  return { getCache, updateCache };
 };
+
+const { getCache, updateCache } = createDbCache();
+
+await updateCache();
+setInterval(updateCache, 30000);
+
+export const load: PageServerLoad = async (): Promise<Record<string, WithId<PageType>[]>> => ({
+  dbContent: getCache(),
+});

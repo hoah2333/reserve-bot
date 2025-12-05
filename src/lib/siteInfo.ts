@@ -1,4 +1,4 @@
-const siteName: Record<string, string> = {
+export const siteName: Record<string, string> = {
   "01": "backrooms-wiki",
   "02": "ru-backrooms-wiki",
   "03": "fr-backrooms-wiki",
@@ -8,9 +8,10 @@ const siteName: Record<string, string> = {
   "07": "backrooms-vn",
   "08": "japan-backrooms-wiki",
   "15": "",
+  "99": "backrooms-wiki-cn",
 };
 
-const siteId: Record<string, number> = {
+export const siteId: Record<string, number> = {
   "01": 4431268,
   "02": 4548260,
   "03": 4710749,
@@ -20,9 +21,5 @@ const siteId: Record<string, number> = {
   "07": 4748367,
   "08": 4864894,
   "15": 0,
-};
-
-export default {
-  siteName,
-  siteId,
+  "99": 4716348,
 };

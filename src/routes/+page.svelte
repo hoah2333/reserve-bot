@@ -1,5 +1,6 @@
 <script lang="ts">
-  export let data;
+  const { data } = $props();
+  const dbContent = $derived(data.dbContent);
 </script>
 
 <div class="header">
@@ -18,7 +19,7 @@
       </tr>
     </thead>
     <tbody>
-      {#each data.dbContent as dbData, index}
+      {#each dbContent as dbData, index}
         <tr>
           <td data-id={dbData._id}>{index + 1}</td>
           <td data-id={dbData._id}>
@@ -54,5 +55,5 @@
 </div>
 
 <style lang="scss" type="text/scss">
-  @import "./page";
+  @use "./page";
 </style>
