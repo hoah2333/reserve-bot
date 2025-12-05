@@ -3,7 +3,7 @@
   const dbContent = $derived(data.dbContent);
 </script>
 
-<div class="header">
+<div class="text-center">
   <h2>翻译预定归档列表</h2>
 </div>
 
@@ -21,8 +21,8 @@
     <tbody>
       {#each dbContent as dbData, index}
         <tr>
-          <td data-id={dbData._id}>{index + 1}</td>
-          <td data-id={dbData._id}>
+          <td>{index + 1}</td>
+          <td>
             <a
               href="https://www.wikidot.com/user:info/{dbData.username
                 .replace(/[.'!&\-\\/\(\)\+ ]+/g, '-')
@@ -33,13 +33,13 @@
               {dbData.username}
             </a>
           </td>
-          <td data-id={dbData._id}>{new Date(dbData.date).toLocaleString()}</td>
-          <td data-id={dbData._id}>
+          <td>{new Date(dbData.date).toLocaleString()}</td>
+          <td>
             <a href={dbData.originalLink} target="_blank" rel="noopener noreferrer">
               {dbData.originalLink}
             </a>
           </td>
-          <td data-id={dbData._id}>
+          <td>
             <a
               href="https://backrooms-tech-cn.wikidot.com/{dbData.reservePage}"
               target="_blank"

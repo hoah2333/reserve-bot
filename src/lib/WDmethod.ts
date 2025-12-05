@@ -117,7 +117,7 @@ export const wdMethod = (baseUrl: string) => {
   const cromApiRequest = async (
     gqlQueryString: string,
     variables: Record<string, string>,
-  ): Promise<Record<string, any>> => {
+  ): Promise<Record<string, unknown>> => {
     return await retry(async () => {
       try {
         const response = await fetch("https://apiv1.crom.avn.sh/graphql", {

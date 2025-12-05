@@ -2,7 +2,12 @@
 const config = {
   printWidth: 120,
   tabWidth: 2,
-  plugins: ["prettier-plugin-svelte", "prettier-plugin-organize-imports"],
+  plugins: [
+    "prettier-plugin-svelte",
+    "prettier-plugin-organize-imports",
+    "prettier-plugin-tailwindcss",
+  ],
+  tailwindStylesheet: "./src/routes/layout.css",
   trailingComma: "all",
   experimentalTernaries: true,
   quoteProps: "consistent",
