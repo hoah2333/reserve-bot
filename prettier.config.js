@@ -8,6 +8,7 @@ const config = {
     "prettier-plugin-tailwindcss",
   ],
   tailwindStylesheet: "./src/routes/layout.css",
+  tailwindFunctions: ["clsx", "cn", "tv"],
   trailingComma: "all",
   experimentalTernaries: true,
   quoteProps: "consistent",

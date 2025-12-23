@@ -12,7 +12,18 @@ const config: { username: string; password: string; dbLink: string } = JSON.pars
   readFileSync("./config.json", "utf-8"),
 );
 
-const debugInfo = (message: string): void => console.log(`${new Date().toLocaleString()} - ${message}`);
+const COLOR = {
+  RED: "\x1b[31m",
+  GREEN: "\x1b[32m",
+  YELLOW: "\x1b[33m",
+  BLUE: "\x1b[34m",
+  MAGENTA: "\x1b[35m",
+  CYAN: "\x1b[36m",
+  WHITE: "\x1b[37m",
+  RESET: "\x1b[0m",
+};
+const debugInfo = (message: string): void =>
+  console.log(`${COLOR.CYAN}${new Date().toLocaleString()} ${COLOR.GREEN}-${COLOR.RESET} ${message}`);
 
 const techSiteName: string = "https://backrooms-tech-cn.wikidot.com";
 
