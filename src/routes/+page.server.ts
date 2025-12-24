@@ -1,11 +1,11 @@
-import { readFileSync } from "fs";
+import { env } from "$env/dynamic/private";
 import { MongoClient } from "mongodb";
 
 import type { Collection, WithId } from "mongodb";
 import type { PageServerLoad } from "./$types";
 import type { PageType } from "./types";
 
-const config: { dbLink: string } = JSON.parse(readFileSync("./config.json", "utf-8"));
+const config: { dbLink: string } = { dbLink: env.DB_LINK };
 
 const createDbCache = () => {
   let cache: WithId<PageType>[] = [];

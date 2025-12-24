@@ -1,6 +1,6 @@
 {
   "name": "reserve-bot",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
@@ -15,6 +15,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
+    "@hoah2333/wikidot-lib": "^0.0.3",
     "@internationalized/date": "^3.10.1",
     "@lucide/svelte": "^0.562.0",
     "@neoconfetti/svelte": "^2.2.2",
@@ -34,7 +35,6 @@
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-svelte": "^3.13.1",
-    "express": "^5.2.1",
     "globals": "^16.5.0",
     "jsdom": "^27.3.0",
     "mongodb": "^7.0.0",

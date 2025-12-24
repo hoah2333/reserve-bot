@@ -1,3 +1,6 @@
 onlyBuiltDependencies:
   - esbuild
   - '@tailwindcss/oxide'
+
+patchedDependencies:
+  cssstyle@5.3.5: patches/cssstyle@5.3.5.patch

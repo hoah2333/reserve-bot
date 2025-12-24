@@ -1,0 +1,26 @@
+diff --git a/lib/generated/properties.js b/lib/generated/properties.js
+index 2fdb972af0f2feaf165a50e6eceecfe72d19d41d..ee7667d2be0c3fdcc3fbc40e04a3454e3391c487 100644
+--- a/lib/generated/properties.js
++++ b/lib/generated/properties.js
+@@ -4756,7 +4756,7 @@ font_export_parse = function parse(v, opt = {}) {
+       parse: lineHeight_export_parse,
+       definition: lineHeight_export_definition
+     }.parse(lineB, {
+-      global
++      global: global
+     });
+     if (typeof lineHeightB !== "string") {
+       return;
+diff --git a/lib/properties/font.js b/lib/properties/font.js
+index 4cbcf553526b7c774575cf7ebf8abc307ae82081..8a8d5a0b3d1e9cb73ce54427ca630fc7094b4fa2 100644
+--- a/lib/properties/font.js
++++ b/lib/properties/font.js
+@@ -47,7 +47,7 @@ module.exports.parse = function parse(v, opt = {}) {
+       return;
+     }
+     const lineHeightB = lineHeight.parse(lineB, {
+-      global
++      global: global
+     });
+     if (typeof lineHeightB !== "string") {
+       return;

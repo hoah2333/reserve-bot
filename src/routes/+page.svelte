@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "$lib/components/ui/table";
+  import { Button } from "$lib/components/ui/button";
   import {
     Pagination,
     PaginationContent,
@@ -9,9 +9,9 @@
     PaginationEllipsis,
     PaginationLink,
   } from "$lib/components/ui/pagination";
+  import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "$lib/components/ui/table";
 
   import type { PageItem } from "bits-ui";
-  import Button from "$lib/components/ui/button/button.svelte";
 
   let { data } = $props();
   let dbContent = $derived(data.dbContent);

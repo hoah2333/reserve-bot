@@ -1,16 +1,18 @@
-import { wdModule } from "$lib/WDmodule";
+import { env } from "$env/dynamic/private";
 import { siteName } from "$lib/siteInfo";
-import { readFileSync } from "fs";
+import { wdModule } from "@hoah2333/wikidot-lib";
 import { JSDOM } from "jsdom";
 import { MongoClient } from "mongodb";
 
-import type { AjaxResponse } from "$lib/types";
+import type { AjaxResponse } from "@hoah2333/wikidot-lib";
 import type { Collection, WithId } from "mongodb";
 import type { PageType } from "./types";
 
-const config: { username: string; password: string; dbLink: string } = JSON.parse(
-  readFileSync("./config.json", "utf-8"),
-);
+const config: { username: string; password: string; dbLink: string } = {
+  username: env.LOGIN_USERNAME,
+  password: env.LOGIN_PASSWORD,
+  dbLink: env.DB_LINK,
+};
 
 const COLOR = {
   RED: "\x1b[31m",
